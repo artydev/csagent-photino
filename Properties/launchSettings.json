@@ -1,0 +1,23 @@
+{
+  "profiles": {
+    "Default": {
+      "commandName": "Project",
+      "nativeDebugging": false
+    },
+    "Desktop": {
+      "commandName": "Project",
+      "commandLineArgs": "--desktop",
+      "nativeDebugging": false
+    },
+    "WebUI": {
+      "commandName": "Project",
+      "commandLineArgs": "--ui",
+      "nativeDebugging": false
+    },
+    "Terminal": {
+      "commandName": "Project",
+      "nativeDebugging": false
+    }
+  },
+  "$schema": "https://json.schemastore.org/launchsettings.json"
+}
