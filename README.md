@@ -28,7 +28,7 @@ Program.cs  (point d'entrée — analyse des arguments + sélection du mode)
    │
    ├── Presentation/Tui      → interface terminale (CLI)
    ├── Presentation/Web      → interface web (serveur ASP.NET + SSE)
-   └── Presentation/Desktop  → fenêtre native (AOTrino WebView2, Windows)
+   └── Presentation/Desktop  → fenêtre native (Photino, multiplateforme)
         │
         └── Core/Agent/CodingAgent   (boucle d'agent autonome)
              │
@@ -63,7 +63,7 @@ Program.cs  (point d'entrée — analyse des arguments + sélection du mode)
     `ConsoleRenderer`, `TuiHost`).
   - `Web/` — serveur web avec flux SSE (`WebHost`, `ApiEndpoints`,
     `SseObserver`, `StaticAssets`).
-  - `Desktop/` — fenêtre native Windows via AOTrino (`DesktopHost`,
+  - `Desktop/` — fenêtre native multiplateforme via Photino (`DesktopHost`,
     `DesktopAPI`, `DesktopObserver`).
 
 ### Flux d'exécution
@@ -110,8 +110,7 @@ indiqué. Les arguments sont sensibles à la casse.
 |--------------|-------------------|----------------------------------------------------------|
 | *(aucun)*    | —                 | Mode CLI — session terminale interactive                 |
 | `--ui`       | `IsUiMode`        | Mode interface web — démarre un serveur web (port 5050 par défaut) |
-| `--native`   | `IsNativeMode`    | Mode fenêtre native — fenêtre AOTrino WebView2 (Windows) |
-| `--desktop`  | `IsDesktopMode`   | Alias du mode fenêtre native (également accepté)         |
+| `--desktop`  | `IsDesktopMode`   | Mode fenêtre native — fenêtre Photino multiplateforme     |
 
 #### Options
 
@@ -130,7 +129,7 @@ indiqué. Les arguments sont sensibles à la casse.
 Si aucun `--mem <fichier>` n'est fourni, le **premier** argument qui n'est pas un
 drapeau reconnu et qui ne commence pas par `-` est traité comme le fichier
 mémoire. Les jetons reconnus qui ne sont pas des drapeaux sont `--ui`,
-`--native`, `--desktop` et `--dry-run` ; tout autre argument commençant par `-`
+`--desktop` et `--dry-run` ; tout autre argument commençant par `-`
 est ignoré. Si aucun n'est trouvé, la valeur par défaut `agent_memory.json` est
 utilisée.
 
@@ -148,7 +147,7 @@ utilisée.
 - **`--version`** — définit `ShowVersion`.
 - **`--doc`** — définit `ShowDoc`.
 - **`--dry-run`** — définit `IsDryRun`.
-- **`--ui` / `--native` / `--desktop`** — définissent leurs drapeaux de mode
+- **`--ui` / `--desktop`** — définissent leurs drapeaux de mode
   respectifs.
 
 ### Exemples
@@ -156,12 +155,11 @@ utilisée.
 ```
 csagent                                    Mode CLI
 csagent --ui                               Mode interface web (port 5050)
-csagent --native                           Mode fenêtre native
-csagent --desktop                          Mode fenêtre native (alias)
+csagent --desktop                          Mode fenêtre native
 csagent --ui --port 8080                   Interface web sur le port 8080
 csagent --model gpt-4o                     CLI avec un modèle personnalisé
 csagent --ui --model gpt-4o                Interface web avec modèle personnalisé
-csagent --native --model gpt-4o            Fenêtre native avec modèle personnalisé
+csagent --desktop --model gpt-4o            Fenêtre native avec modèle personnalisé
 csagent --mem my_history.json              CLI avec un fichier mémoire personnalisé
 csagent --ui --mem my_history.json         Interface web avec fichier mémoire personnalisé
 csagent --dry-run                          Mode dry-run (aucune modification)
