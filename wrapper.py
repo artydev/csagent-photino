@@ -100,6 +100,34 @@ static int mkdir_p(const char *dir) {
     return mkdir(tmp, 0755);
 }
 
+/* Copy a file from the temp dir back to the original working directory.
+ * This preserves runtime-generated files (e.g. agent_memory.json) that the
+ * app writes to its current working directory, which is the temp dir. */
+static void copy_back(const char *tmpdir, const char *orig_cwd, const char *name)
+{
+    char src[4096];
+    char dst[4096];
+    FILE *in, *out;
+    char buf[65536];
+    size_t n;
+
+    snprintf(src, sizeof(src), "%s/%s", tmpdir, name);
+    snprintf(dst, sizeof(dst), "%s/%s", orig_cwd, name);
+
+    in = fopen(src, "rb");
+    if (!in)
+        return;  /* file was not generated — nothing to copy */
+    out = fopen(dst, "wb");
+    if (!out) {
+        fclose(in);
+        return;
+    }
+    while ((n = fread(buf, 1, sizeof(buf), in)) > 0)
+        fwrite(buf, 1, n, out);
+    fclose(in);
+    fclose(out);
+}
+
 static void cleanup_files(const char *tmpdir)
 {
     char path[4096];
@@ -129,12 +157,20 @@ static void cleanup_files(const char *tmpdir)
     parts.append("""int main(int argc, char *argv[]) {
     char tmpdir[4096];
     char path[4096];
+    char orig_cwd[4096];
     char *env;
     char new_ld_path[8192];
     const char *main_binary;
     pid_t pid;
     int status;
     int devnull = -1;
+
+    /* Remember the original working directory so runtime-generated files
+     * (e.g. agent_memory.json) can be copied back after the app exits. */
+    if (getcwd(orig_cwd, sizeof(orig_cwd)) == NULL) {
+        fprintf(stderr, "Error: getcwd failed: %s\\n", strerror(errno));
+        return 1;
+    }
 
     /* Create a temporary directory */
     snprintf(tmpdir, sizeof(tmpdir), "/tmp/photino_wrapper_XXXXXX");
@@ -241,6 +277,11 @@ static void cleanup_files(const char *tmpdir)
     parts.append('        int exit_code;')
     parts.append('        waitpid(pid, &status, 0);')
     parts.append('        exit_code = WIFEXITED(status) ? WEXITSTATUS(status) : 1;')
+    parts.append('')
+    parts.append('        /* Copy runtime-generated files back to the original')
+    parts.append('         * working directory before cleaning up the temp dir. */')
+    parts.append('        copy_back(tmpdir, orig_cwd, "agent_memory.json");')
+    parts.append('')
     parts.append('        cleanup_files(tmpdir);')
     parts.append('        return exit_code;')
     parts.append('    }')
