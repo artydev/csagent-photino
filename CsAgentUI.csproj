@@ -17,6 +17,13 @@
     <PlatformTarget>x64</PlatformTarget>
     <Platforms>AnyCPU;x64</Platforms>
     <!--
+      The web UI serves all assets (HTML/JS/CSS) from embedded resources, so the
+      ASP.NET static web assets feature is unused. Disable it to prevent the
+      staticwebassets.endpoints.json from being generated and published as dead
+      weight in the single-file output.
+    -->
+    <StaticWebAssetsEnabled>false</StaticWebAssetsEnabled>
+    <!--
       The project intentionally uses System.Text.Json.Nodes with AOT/trimming.
       The IL2026/IL3050 warnings are informational about AOT compatibility and
       are accepted as part of this design, so they are suppressed to keep the
@@ -51,6 +58,16 @@
     <EmbeddedResource Remove="PhotinoAOT\**\*" />
     <None Remove="PhotinoAOT\**\*" />
     <Content Remove="PhotinoAOT\**\*" />
+  </ItemGroup>
+
+  <!--
+    The wwwroot/ directory is unused by the app (all web assets are embedded
+    resources). Exclude it from the build and publish output so it doesn't get
+    copied as dead weight alongside the single-file executable.
+  -->
+  <ItemGroup>
+    <Content Remove="wwwroot\**\*" />
+    <None Remove="wwwroot\**\*" />
   </ItemGroup>
 
   <ItemGroup>
