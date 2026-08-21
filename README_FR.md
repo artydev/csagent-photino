@@ -83,6 +83,102 @@ Program.cs  (point d'entrée — analyse des arguments + sélection du mode)
 - SDK .NET 10 (ou un binaire autonome publié en un seul fichier)
 - Une clé API pour un point de terminaison compatible OpenAI
 
+## Compilation et distribution
+
+Le projet fournit un `Makefile` qui automatise la compilation et la
+distribution. Il propose plusieurs modes selon la plateforme cible.
+
+### Cibles du Makefile
+
+| Cible | Description |
+|-------|-------------|
+| `make publish` | **Linux** — binaire AOT autonome en un seul fichier + `Photino.Native.so` |
+| `make wrap` | **Linux** — exécutable unique auto-extractible (via `wrapper.py`) |
+| `make publish-win` | **Windows** — exécutable autonome en un seul fichier (non-AOT, compilable depuis Linux) |
+| `make publish-win-aot` | **Windows** — AOT natif (doit être exécuté **sur une machine Windows**) |
+| `make all` | Construit les deux distributions Linux |
+| `make test` | Vérifie que l'exécutable publié fonctionne |
+| `make clean` | Supprime les artefacts de compilation (`bin/`, `obj/`, `publish/`, `dist/`) |
+| `make help` | Affiche l'aide |
+
+### Variables configurables
+
+| Variable | Défaut | Description |
+|----------|--------|-------------|
+| `RID` | `linux-x64` | Identifiant d'exécution Linux |
+| `WIN_RID` | `win-x64` | Identifiant d'exécution Windows |
+| `CONFIG` | `Release` | Configuration de compilation |
+| `WRAPPER` | `wrapper.py` | Chemin du script wrapper |
+| `WRAP_SUPPRESS` | `1` | Supprime la sortie de débogage Photino dans le build wrapper |
+| `WRAP_STATIC` | `0` | Lie statiquement le wrapper (nécessite une libc statique) |
+
+### Distribution Linux
+
+**Mode standard** (`make publish`) — produit un binaire AOT autonome en un seul
+fichier accompagné de la bibliothèque native Photino :
+
+```
+publish/linux-x64/CsAgentUI
+publish/linux-x64/Photino.Native.so
+```
+
+> **Important :** `Photino.Native.so` doit rester **à côté** de l'exécutable.
+> Le nom de fichier est codé en dur par Photino (via `DllImport("Photino.Native")`)
+> et ne peut pas être renommé.
+
+**Mode wrapper** (`make wrap`) — produit un **exécutable unique**
+auto-extractible qui embarque `CsAgentUI` et `Photino.Native.so`, puis les
+extrait dans `/tmp` au lancement :
+
+```
+dist/CsAgentUI-wrapper
+```
+
+> Ce mode est **Linux uniquement** (il utilise `fork`/`execv`/`LD_LIBRARY_PATH`
+> et `/tmp`). Il nécessite un accès en écriture à `/tmp` au moment de
+> l'exécution.
+
+### Distribution Windows
+
+**Non-AOT** (`make publish-win`) — compilable **depuis Linux**. Produit un
+exécutable autonome en un seul fichier (le runtime .NET est inclus) :
+
+```
+publish/win-x64/CsAgentUI.exe
+publish/win-x64/Photino.Native.dll
+publish/win-x64/WebView2Loader.dll
+```
+
+> **Important :** Windows nécessite **deux** fichiers natifs — `Photino.Native.dll`
+> **et** `WebView2Loader.dll` (WebView2 est le moteur web de Windows). Les deux
+> doivent rester à côté de l'exécutable.
+
+**AOT natif** (`make publish-win-aot`) — produit un exécutable plus petit, mais
+**doit être exécuté sur une machine Windows** (ou un runner CI Windows). .NET
+Native AOT ne prend pas en charge la compilation croisée entre systèmes
+d'exploitation :
+
+```
+error : Cross-OS native compilation is not supported.
+```
+
+### Pourquoi pas un binaire unique statique ?
+
+Photino est une fine surcouche gérée autour du moteur web du système
+d'exploitation (WebKitGTK sur Linux, WebView2 sur Windows, WKWebView sur macOS).
+Deux raisons empêchent un binaire unique entièrement statique :
+
+1. **P/Invoke** — .NET charge `Photino.Native` dynamiquement au lancement
+   (`dlopen`/`LoadLibrary`). Le nom est codé en dur dans `Photino.NET.dll` et
+   ne peut pas être résolu vers une bibliothèque statique.
+2. **Dépendances système** — `Photino.Native.so` dépend de bibliothèques
+   système dynamiques (WebKitGTK, GTK3, GLib, JavaScriptCore) qui ne sont pas
+   conçues pour la liaison statique.
+
+Le mode `wrapper.py` est donc la solution la plus proche d'un « fichier unique »,
+mais il reste un archive auto-extractible qui nécessite `/tmp` et les
+bibliothèques système au moment de l'exécution.
+
 ## Configuration
 
 Définissez votre clé API comme variable d'environnement :
