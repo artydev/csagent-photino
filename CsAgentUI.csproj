@@ -24,6 +24,12 @@
     -->
     <StaticWebAssetsEnabled>false</StaticWebAssetsEnabled>
     <!--
+      This is a self-hosted console app (not deployed to IIS), so the ASP.NET
+      IIS hosting artifacts (aspnetcorev2_inprocess.dll and web.config) are
+      unnecessary. Disable them so they are not published.
+    -->
+    <PublishIISAssets>false</PublishIISAssets>
+    <!--
       The project intentionally uses System.Text.Json.Nodes with AOT/trimming.
       The IL2026/IL3050 warnings are informational about AOT compatibility and
       are accepted as part of this design, so they are suppressed to keep the

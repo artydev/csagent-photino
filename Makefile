@@ -1,29 +1,44 @@
 # =============================================================================
 # CsAgentUI — Build & Distribution Makefile
 #
-# Two distribution modes are available:
+# Distribution modes:
 #
-#   1. STANDARD  (make publish)
+#   1. STANDARD LINUX  (make publish)
 #        Single-file AOT executable + Photino.Native.so alongside it.
 #        Cross-platform, honest, no runtime extraction.
 #        Output:  publish/<RID>/CsAgentUI  +  Photino.Native.so
 #
-#   2. WRAPPED   (make wrap)
+#   2. WRAPPED LINUX   (make wrap)
 #        A single self-extracting executable produced by wrapper.py.
 #        Embeds CsAgentUI + Photino.Native.so, extracts to /tmp at runtime.
 #        Linux-only (uses fork/execv/LD_LIBRARY_PATH), needs /tmp write access.
 #        Output:  dist/CsAgentUI-wrapper
 #
+#   3. WINDOWS         (make publish-win)
+#        Self-contained single-file Windows executable (non-AOT, works from
+#        Linux) + Photino.Native.dll + WebView2Loader.dll.
+#        Output:  publish/win-x64/CsAgentUI.exe  +  Photino.Native.dll
+#                 +  WebView2Loader.dll
+#
+#   NOTE on Native AOT for Windows:
+#     .NET Native AOT cannot cross-compile across OSes ("Cross-OS native
+#     compilation is not supported"). To get a Native AOT Windows build you
+#     must run the publish ON a Windows machine (or Windows CI runner).
+#     See the 'publish-win-aot' target below.
+#
 # Usage:
-#   make publish            Standard single-file AOT publish
-#   make wrap               Wrapped single self-extracting executable
-#   make all                Both distributions
+#   make publish            Standard Linux single-file AOT publish
+#   make wrap               Wrapped Linux single self-extracting executable
+#   make publish-win        Windows self-contained single-file (non-AOT)
+#   make publish-win-aot    Windows Native AOT (must run on Windows)
+#   make all                Linux standard + wrapped
 #   make test               Verify the published executable runs
 #   make clean              Remove build/publish/dist artifacts
 #   make help               Show this help
 #
 # Overridable variables:
 #   RID=linux-x64           Runtime identifier (default: linux-x64)
+#   WIN_RID=win-x64         Windows runtime identifier
 #   CONFIG=Release          Build configuration
 #   WRAPPER=wrapper.py      Path to the wrapper script
 #   WRAP_SUPPRESS=1         Suppress Photino debug output in wrapped build
@@ -32,6 +47,7 @@
 
 # --- Configuration -----------------------------------------------------------
 RID        ?= linux-x64
+WIN_RID    ?= win-x64
 CONFIG     ?= Release
 WRAPPER    ?= wrapper.py
 WRAP_SUPPRESS ?= 1
@@ -39,6 +55,7 @@ WRAP_STATIC   ?= 0
 
 # --- Derived paths -----------------------------------------------------------
 PUBLISH_DIR := publish/$(RID)
+WIN_PUBLISH_DIR := publish/$(WIN_RID)
 DIST_DIR    := dist
 BINARY      := CsAgentUI
 NATIVE_LIB  := Photino.Native.so
@@ -50,31 +67,31 @@ PYTHON ?= python3
 GCC    ?= gcc
 
 # --- Phony targets -----------------------------------------------------------
-.PHONY: all publish wrap test clean help
+.PHONY: all publish wrap publish-win publish-win-aot test clean help
 
 all: publish wrap
 	@echo ""
-	@echo "=== Both distributions built ==="
+	@echo "=== Both Linux distributions built ==="
 	@echo "  Standard: $(PUBLISH_DIR)/$(BINARY) + $(NATIVE_LIB)"
 	@echo "  Wrapped : $(WRAP_OUT)"
 
-# --- Standard single-file AOT publish ----------------------------------------
+# --- Standard Linux single-file AOT publish ----------------------------------
 publish:
-	@echo "=== Publishing single-file AOT ($(CONFIG)/$(RID)) ==="
+	@echo "=== Publishing Linux single-file AOT ($(CONFIG)/$(RID)) ==="
 	$(DOTNET) publish -c $(CONFIG) -r $(RID) --self-contained true \
 		-p:PublishSingleFile=true -p:PublishAot=true \
 		-o $(PUBLISH_DIR)
 	@echo ""
-	@echo "=== Standard distribution ready ==="
+	@echo "=== Standard Linux distribution ready ==="
 	@echo "  Executable : $(PUBLISH_DIR)/$(BINARY)"
 	@echo "  Native lib : $(PUBLISH_DIR)/$(NATIVE_LIB)  (required for --desktop)"
 	@echo ""
 	@echo "  NOTE: $(NATIVE_LIB) must stay alongside the executable;"
 	@echo "        the filename is hardcoded by Photino and cannot be renamed."
 
-# --- Wrapped single self-extracting executable -------------------------------
+# --- Wrapped Linux single self-extracting executable -------------------------
 wrap: publish
-	@echo "=== Building wrapped single executable via $(WRAPPER) ==="
+	@echo "=== Building wrapped Linux single executable via $(WRAPPER) ==="
 	@mkdir -p $(DIST_DIR)
 	$(PYTHON) $(WRAPPER) $(PUBLISH_DIR) \
 		--binary $(BINARY) \
@@ -83,9 +100,43 @@ wrap: publish
 		$(if $(filter 1,$(WRAP_SUPPRESS)),--suppress-debug,) \
 		$(if $(filter 1,$(WRAP_STATIC)),--static,)
 	@echo ""
-	@echo "=== Wrapped distribution ready ==="
+	@echo "=== Wrapped Linux distribution ready ==="
 	@echo "  Single file : $(WRAP_OUT)"
 	@echo "  (self-extracts $(NATIVE_LIB) to /tmp at runtime; Linux-only)"
+
+# --- Windows self-contained single-file (non-AOT, buildable from Linux) ------
+publish-win:
+	@echo "=== Publishing Windows self-contained single-file ($(CONFIG)/$(WIN_RID)) ==="
+	@echo "  (non-AOT: Native AOT cannot cross-compile across OSes)"
+	$(DOTNET) publish -c $(CONFIG) -r $(WIN_RID) --self-contained true \
+		-p:PublishSingleFile=true -p:PublishAot=false \
+		-o $(WIN_PUBLISH_DIR)
+	@echo ""
+	@echo "=== Windows distribution ready ==="
+	@echo "  Executable  : $(WIN_PUBLISH_DIR)/$(BINARY).exe"
+	@echo "  Native lib  : $(WIN_PUBLISH_DIR)/Photino.Native.dll"
+	@echo "  WebView2    : $(WIN_PUBLISH_DIR)/WebView2Loader.dll"
+	@echo ""
+	@echo "  NOTE: Windows needs BOTH Photino.Native.dll AND WebView2Loader.dll"
+	@echo "        alongside the exe (WebView2 is the Windows webview engine)."
+	@echo "        This is a non-AOT build (bundles the .NET runtime); for a"
+	@echo "        smaller Native AOT build, run 'make publish-win-aot' ON a"
+	@echo "        Windows machine."
+
+# --- Windows Native AOT (MUST be run on a Windows machine) -------------------
+publish-win-aot:
+	@echo "=== Publishing Windows Native AOT ($(CONFIG)/$(WIN_RID)) ==="
+	@echo "  NOTE: .NET Native AOT cannot cross-compile across OSes."
+	@echo "  This target MUST be run on a Windows machine (or Windows CI)."
+	@echo "  On Linux it will fail with: Cross-OS native compilation is not supported."
+	$(DOTNET) publish -c $(CONFIG) -r $(WIN_RID) --self-contained true \
+		-p:PublishSingleFile=true -p:PublishAot=true \
+		-o $(WIN_PUBLISH_DIR)
+	@echo ""
+	@echo "=== Windows Native AOT distribution ready ==="
+	@echo "  Executable  : $(WIN_PUBLISH_DIR)/$(BINARY).exe"
+	@echo "  Native lib  : $(WIN_PUBLISH_DIR)/Photino.Native.dll"
+	@echo "  WebView2    : $(WIN_PUBLISH_DIR)/WebView2Loader.dll"
 
 # --- Verify the published executable runs ------------------------------------
 test: publish
@@ -111,10 +162,12 @@ clean:
 help:
 	@echo "CsAgentUI build & distribution targets:"
 	@echo ""
-	@echo "  make publish   Standard single-file AOT (exe + Photino.Native.so)"
-	@echo "  make wrap      Wrapped single self-extracting executable"
-	@echo "  make all       Build both distributions"
-	@echo "  make test      Verify the published executable runs"
-	@echo "  make clean     Remove build/publish/dist artifacts"
+	@echo "  make publish         Standard Linux single-file AOT (exe + Photino.Native.so)"
+	@echo "  make wrap            Wrapped Linux single self-extracting executable"
+	@echo "  make publish-win     Windows self-contained single-file (non-AOT, from Linux)"
+	@echo "  make publish-win-aot Windows Native AOT (MUST run on a Windows machine)"
+	@echo "  make all             Build both Linux distributions"
+	@echo "  make test            Verify the published executable runs"
+	@echo "  make clean           Remove build/publish/dist artifacts"
 	@echo ""
-	@echo "Variables: RID, CONFIG, WRAPPER, WRAP_SUPPRESS, WRAP_STATIC"
+	@echo "Variables: RID, WIN_RID, CONFIG, WRAPPER, WRAP_SUPPRESS, WRAP_STATIC"
