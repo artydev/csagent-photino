@@ -13,6 +13,7 @@
 #        Embeds CsAgentUI + Photino.Native.so, extracts to /tmp at runtime.
 #        Linux-only (uses fork/execv/LD_LIBRARY_PATH), needs /tmp write access.
 #        Output:  dist/CsAgentUI-wrapper
+#        (the intermediate publish/ directory is removed after wrapping)
 #
 #   3. WINDOWS         (make publish-win)
 #        Self-contained single-file Windows executable (non-AOT, works from
@@ -69,7 +70,12 @@ GCC    ?= gcc
 # --- Phony targets -----------------------------------------------------------
 .PHONY: all publish wrap publish-win publish-win-aot test clean help
 
-all: publish wrap
+# Build both Linux distributions. 'wrap' removes the intermediate publish/
+# directory, so re-run 'publish' afterwards to leave the standard distribution
+# in place too.
+all:
+	$(MAKE) wrap
+	$(MAKE) publish
 	@echo ""
 	@echo "=== Both Linux distributions built ==="
 	@echo "  Standard: $(PUBLISH_DIR)/$(BINARY) + $(NATIVE_LIB)"
@@ -99,6 +105,10 @@ wrap: publish
 		--output $(WRAP_OUT) \
 		$(if $(filter 1,$(WRAP_SUPPRESS)),--suppress-debug,) \
 		$(if $(filter 1,$(WRAP_STATIC)),--static,)
+	@echo ""
+	@echo "=== Removing intermediate publish directory ==="
+	@rm -rf $(PUBLISH_DIR)
+	@echo "  Removed $(PUBLISH_DIR)/ (CsAgentUI, CsAgentUI.dbg, $(NATIVE_LIB))"
 	@echo ""
 	@echo "=== Wrapped Linux distribution ready ==="
 	@echo "  Single file : $(WRAP_OUT)"

@@ -93,10 +93,10 @@ distribution. Il propose plusieurs modes selon la plateforme cible.
 | Cible | Description |
 |-------|-------------|
 | `make publish` | **Linux** — binaire AOT autonome en un seul fichier + `Photino.Native.so` |
-| `make wrap` | **Linux** — exécutable unique auto-extractible (via `wrapper.py`) |
+| `make wrap` | **Linux** — exécutable unique auto-extractible (via `wrapper.py`) ; supprime le répertoire `publish/` intermédiaire |
 | `make publish-win` | **Windows** — exécutable autonome en un seul fichier (non-AOT, compilable depuis Linux) |
 | `make publish-win-aot` | **Windows** — AOT natif (doit être exécuté **sur une machine Windows**) |
-| `make all` | Construit les deux distributions Linux |
+| `make all` | Construit les deux distributions Linux (standard + wrapper) |
 | `make test` | Vérifie que l'exécutable publié fonctionne |
 | `make clean` | Supprime les artefacts de compilation (`bin/`, `obj/`, `publish/`, `dist/`) |
 | `make help` | Affiche l'aide |
@@ -133,6 +133,11 @@ extrait dans `/tmp` au lancement :
 ```
 dist/CsAgentUI-wrapper
 ```
+
+> `make wrap` **supprime le répertoire `publish/` intermédiaire** après avoir
+> produit le wrapper : il ne reste que le fichier unique `dist/CsAgentUI-wrapper`.
+> Pour conserver **aussi** la distribution standard, utilisez `make all` (qui
+> reconstruit `publish/` après le wrapping).
 
 > Ce mode est **Linux uniquement** (il utilise `fork`/`execv`/`LD_LIBRARY_PATH`
 > et `/tmp`). Il nécessite un accès en écriture à `/tmp` au moment de
