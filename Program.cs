@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using CsAgentUI.Presentation.Desktop;
 using CsAgentUI.Presentation.Tui;
 using CsAgentUI.Presentation.Web;
 using CsAgentUI.Shared;
@@ -31,7 +32,12 @@ public static class Program
             return 0;
         }
 
-        if (parsed.IsUiMode)
+        if (parsed.IsDesktopMode)
+        {
+            // Desktop mode — native window via Photino (PhotinoAOT)
+            DesktopHost.Run(parsed);
+        }
+        else if (parsed.IsUiMode)
         {
             // Web UI mode — ASP.NET server with SSE
             WebHost.Run(parsed);

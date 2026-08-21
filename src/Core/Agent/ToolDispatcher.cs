@@ -1820,7 +1820,7 @@ public static class ToolDispatcher
             {
                 if (token.Length > 0)
                 {
-                    current = Step(current, token.ToString());
+                    current = Step(current!, token.ToString());
                     if (current is null) return null;
                     token.Clear();
                 }
@@ -1829,7 +1829,7 @@ public static class ToolDispatcher
             {
                 if (token.Length > 0)
                 {
-                    current = Step(current, token.ToString());
+                    current = Step(current!, token.ToString());
                     if (current is null) return null;
                     token.Clear();
                 }
@@ -1860,7 +1860,7 @@ public static class ToolDispatcher
 
         if (token.Length > 0)
         {
-            current = Step(current, token.ToString());
+            current = Step(current!, token.ToString());
             if (current is null) return null;
         }
 

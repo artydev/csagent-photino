@@ -10,4 +10,10 @@ public interface IAgentObserver
     Task OnError(string message);
     Task OnWarning(string message);
     Task OnDanger(string message);
+
+    /// <summary>
+    /// Asks the user to confirm a destructive tool call.
+    /// Returns <c>true</c> if the tool may run, <c>false</c> to decline.
+    /// </summary>
+    Task<bool> Confirm(string toolName);
 }

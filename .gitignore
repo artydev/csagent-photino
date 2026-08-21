@@ -21,6 +21,7 @@ mono_crash.*
 
 # External/unused subfolders
 Aotrino/
+PhotinoAOT/
 
 # Build results
 [Dd]ebug/

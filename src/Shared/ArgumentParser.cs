@@ -8,6 +8,7 @@ public sealed record AgentArguments(
     string? ModelOverride,
     int Port,
     bool IsUiMode,
+    bool IsDesktopMode,
     bool IsDryRun,
     bool ShowHelp,
     bool ShowVersion,
@@ -21,6 +22,7 @@ public static class ArgumentParser
     public static AgentArguments Parse(string[] args)
     {
         var isUiMode = args.Contains("--ui");
+        var isDesktopMode = args.Contains("--desktop");
         var isDryRun = args.Contains("--dry-run");
         var showHelp = args.Contains("--help") || args.Contains("-h") || args.Contains("/?");
         var showVersion = args.Contains("--version");
@@ -29,7 +31,7 @@ public static class ArgumentParser
         var modelOverride = GetModelOverride(args);
         var port = GetPort(args);
 
-        return new AgentArguments(memFile, modelOverride, port, isUiMode, isDryRun, showHelp, showVersion, showDoc);
+        return new AgentArguments(memFile, modelOverride, port, isUiMode, isDesktopMode, isDryRun, showHelp, showVersion, showDoc);
     }
 
     private static string GetMemoryFile(string[] args)
@@ -38,7 +40,7 @@ public static class ArgumentParser
             if (args[i] == "--mem" && i + 1 < args.Length) return args[i + 1];
 
         foreach (var arg in args)
-            if (arg != "--ui" && arg != "--dry-run" && !arg.StartsWith("-")) return arg;
+            if (arg != "--ui" && arg != "--desktop" && arg != "--dry-run" && !arg.StartsWith("-")) return arg;
 
         return "agent_memory.json";
     }

@@ -28,6 +28,9 @@ public class SseObserver(HttpResponse res) : IAgentObserver
     public Task OnError(string m) => Send("error", m);
     public Task OnWarning(string m) => Send("warning", m);
     public Task OnDanger(string m) => Send("danger", m);
+
+    // The SSE (web) flow auto-approves destructive tools for now.
+    public Task<bool> Confirm(string toolName) => Task.FromResult(true);
 }
 
 // ── SSE message types ──
