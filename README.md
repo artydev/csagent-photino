@@ -109,8 +109,16 @@ distribution. Il propose plusieurs modes selon la plateforme cible.
 | `WIN_RID` | `win-x64` | Identifiant d'exécution Windows |
 | `CONFIG` | `Release` | Configuration de compilation |
 | `WRAPPER` | `wrapper.py` | Chemin du script wrapper |
-| `WRAP_SUPPRESS` | `1` | Supprime la sortie de débogage Photino dans le build wrapper |
+| `WRAP_SUPPRESS` | `0` | Supprime **toute** la sortie du build wrapper (désactivé par défaut — voir note ci-dessous) |
 | `WRAP_STATIC` | `0` | Lie statiquement le wrapper (nécessite une libc statique) |
+
+> **Note sur `WRAP_SUPPRESS` :** par défaut (`0`), le wrapper conserve la sortie
+> standard et d'erreur, ce qui permet au **mode TUI/CLI** (mode par défaut) et
+> aux arguments (`--help`, `--version`, `--mem`, etc.) de fonctionner
+> normalement. Mettre `WRAP_SUPPRESS=1` redirige **toute** la sortie (stdout +
+> stderr) vers `/dev/null` pour masquer le bruit de débogage de Photino en mode
+> bureau, mais cela **casse le mode TUI/CLI** (aucune sortie visible). Ne
+> l'activez que pour des déploiements **uniquement bureau**.
 
 ### Distribution Linux
 
@@ -138,6 +146,11 @@ dist/CsAgentUI-wrapper
 > produit le wrapper : il ne reste que le fichier unique `dist/CsAgentUI-wrapper`.
 > Pour conserver **aussi** la distribution standard, utilisez `make all` (qui
 > reconstruit `publish/` après le wrapping).
+
+> Le wrapper transmet **tous les arguments** à l'exécutable embarqué : le mode
+> TUI/CLI par défaut, `--ui`, `--desktop`, `--help`, `--version`, `--mem`,
+> `--model`, `--port`, `--dry-run`, etc. fonctionnent comme avec le binaire
+> standard.
 
 > Ce mode est **Linux uniquement** (il utilise `fork`/`execv`/`LD_LIBRARY_PATH`
 > et `/tmp`). Il nécessite un accès en écriture à `/tmp` au moment de

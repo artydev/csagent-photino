@@ -42,7 +42,9 @@
 #   WIN_RID=win-x64         Windows runtime identifier
 #   CONFIG=Release          Build configuration
 #   WRAPPER=wrapper.py      Path to the wrapper script
-#   WRAP_SUPPRESS=1         Suppress Photino debug output in wrapped build
+#   WRAP_SUPPRESS=0         Suppress ALL output in wrapped build (default OFF —
+#                           keeps the TUI/CLI working; enable only for
+#                           desktop-only deployments to hide Photino noise)
 #   WRAP_STATIC=0           Statically link the wrapper (needs static libc)
 # =============================================================================
 
@@ -51,7 +53,7 @@ RID        ?= linux-x64
 WIN_RID    ?= win-x64
 CONFIG     ?= Release
 WRAPPER    ?= wrapper.py
-WRAP_SUPPRESS ?= 1
+WRAP_SUPPRESS ?= 0
 WRAP_STATIC   ?= 0
 
 # --- Derived paths -----------------------------------------------------------
@@ -181,3 +183,7 @@ help:
 	@echo "  make clean           Remove build/publish/dist artifacts"
 	@echo ""
 	@echo "Variables: RID, WIN_RID, CONFIG, WRAPPER, WRAP_SUPPRESS, WRAP_STATIC"
+	@echo ""
+	@echo "  WRAP_SUPPRESS=1      Suppress ALL output in the wrapped build"
+	@echo "                       (hides Photino debug noise, but breaks the"
+	@echo "                       TUI/CLI — use only for desktop-only deploys)"
