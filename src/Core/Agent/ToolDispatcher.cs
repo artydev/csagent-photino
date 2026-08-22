@@ -13,12 +13,6 @@ namespace CsAgentUI.Core.Agent;
 /// </summary>
 public static class ToolDispatcher
 {
-    private const int ShellTimeoutMs = 60_000;
-    private const int MaxSearchResults = 200;
-    private const long MaxSearchFileBytes = 1_048_576; // skip binary/large files
-    private const int MaxTreeEntries = 500;            // cap tree output to avoid huge responses
-    private const int MaxParseOutputBytes = 512_000;   // cap parse_output input size
-
     /// <summary>
     /// Delegate used by the switch_model tool to change the active model at runtime.
     /// Returns a human-readable confirmation/error message.
@@ -152,12 +146,6 @@ public static class ToolDispatcher
             return $"Error: dispatch failed — {ex.Message}";
         }
     }
-
-    /// <summary>
-    /// Returns true if the tool name is considered destructive (requires user confirmation).
-    /// </summary>
-    public static bool IsDestructive(string name) =>
-        name is "write_file" or "edit_file" or "git_commit" or "move_file" or "delete_file" or "unzip";
 
     /// <summary>
     /// The JSON tool definitions for the LLM API.
@@ -559,8 +547,6 @@ public static class ToolDispatcher
         try
         {
             var full = Path.GetFullPath(path);
-            if (!IsSafePath(full))
-                return $"Error: write_file - Path '{full}' is not allowed for writing. Only files in the current working directory are permitted.";
 
             var dir = Path.GetDirectoryName(full);
             if (!string.IsNullOrWhiteSpace(dir)) Directory.CreateDirectory(dir);
@@ -577,12 +563,8 @@ public static class ToolDispatcher
         try
         {
             var full = Path.GetFullPath(path);
-            if (!IsSafePath(full))
-                return $"Error: read_file - Path '{full}' is not allowed for reading. Only files in the current working directory are permitted.";
 
             if (!File.Exists(full)) return $"Error: not found '{full}'";
-            var len = new FileInfo(full).Length;
-            if (len > 512_000) return $"Error: file too large ({len / 1024} KB). Use sh to grep/head.";
             return File.ReadAllText(full, Encoding.UTF8);
         }
         catch (Exception ex) { return $"Error: read_file — {ex.Message}"; }
@@ -595,13 +577,8 @@ public static class ToolDispatcher
         try
         {
             var full = Path.GetFullPath(path);
-            if (!IsSafePath(full))
-                return $"Error: read_json - Path '{full}' is not allowed for reading. Only files in the current working directory are permitted.";
 
             if (!File.Exists(full)) return $"Error: not found '{full}'";
-
-            var len = new FileInfo(full).Length;
-            if (len > 512_000) return $"Error: file too large ({len / 1024} KB). Use sh to grep/head.";
 
             var text = File.ReadAllText(full, Encoding.UTF8);
             JsonNode? node;
@@ -630,8 +607,6 @@ public static class ToolDispatcher
         try
         {
             var full = Path.GetFullPath(path);
-            if (!IsSafePath(full))
-                return $"Error: list_dir - Path '{full}' is not allowed for listing. Only directories in the current working directory are permitted.";
 
             if (!Directory.Exists(full)) return $"Error: directory not found '{full}'";
 
@@ -665,8 +640,6 @@ public static class ToolDispatcher
         try
         {
             var full = Path.GetFullPath(path);
-            if (!IsSafePath(full))
-                return $"Error: tree - Path '{full}' is not allowed for listing. Only directories in the current working directory are permitted.";
 
             if (!Directory.Exists(full)) return $"Error: directory not found '{full}'";
 
@@ -679,9 +652,6 @@ public static class ToolDispatcher
             sb.AppendLine(rootName + "/");
 
             AppendTreeLevel(full, "", depth, sb, ref count);
-
-            if (count >= MaxTreeEntries)
-                sb.AppendLine($"... (truncated at {MaxTreeEntries} entries)");
 
             return sb.ToString().TrimEnd();
         }
@@ -699,8 +669,6 @@ public static class ToolDispatcher
         StringBuilder sb,
         ref int count)
     {
-        if (count >= MaxTreeEntries) return;
-
         // Gather and sort entries: directories first, then files, each alphabetically.
         var dirs = new List<string>();
         var files = new List<string>();
@@ -730,8 +698,6 @@ public static class ToolDispatcher
 
         for (int i = 0; i < entries.Count; i++)
         {
-            if (count >= MaxTreeEntries) return;
-
             var (name, isDir) = entries[i];
             var isLast = i == entries.Count - 1;
 
@@ -760,8 +726,6 @@ public static class ToolDispatcher
                 return "Error: search_files - 'pattern' argument is required.";
 
             var full = Path.GetFullPath(path);
-            if (!IsSafePath(full))
-                return $"Error: search_files - Path '{full}' is not allowed for searching. Only directories in the current working directory are permitted.";
 
             if (!Directory.Exists(full)) return $"Error: directory not found '{full}'";
 
@@ -783,12 +747,6 @@ public static class ToolDispatcher
                                    p.Equals("obj", StringComparison.OrdinalIgnoreCase)))
                     continue;
 
-                var fi = new FileInfo(file);
-                if (fi.Length > MaxSearchFileBytes) continue;
-
-                // Skip binary files (detect null bytes in the first chunk)
-                if (IsBinaryFile(file)) continue;
-
                 string[] lines;
                 try { lines = File.ReadAllLines(file, Encoding.UTF8); }
                 catch { continue; }
@@ -798,11 +756,7 @@ public static class ToolDispatcher
                     if (lines[i].Contains(needle, StringComparison.OrdinalIgnoreCase))
                     {
                         sb.AppendLine($"{relPath}:{i + 1}: {lines[i].Trim()}");
-                        if (++count >= MaxSearchResults)
-                        {
-                            sb.AppendLine($"... (truncated at {MaxSearchResults} matches)");
-                            return sb.ToString().TrimEnd();
-                        }
+                        count++;
                     }
                 }
             }
@@ -821,8 +775,6 @@ public static class ToolDispatcher
         try
         {
             var full = Path.GetFullPath(path);
-            if (!IsSafePath(full))
-                return $"Error: edit_file - Path '{full}' is not allowed for editing. Only files in the current working directory are permitted.";
 
             if (!File.Exists(full)) return $"Error: not found '{full}'";
 
@@ -873,8 +825,6 @@ public static class ToolDispatcher
         {
             var srcFull = Path.GetFullPath(source);
             var dstFull = Path.GetFullPath(destination);
-            if (!IsSafePath(srcFull) || !IsSafePath(dstFull))
-                return $"Error: copy_file - Paths must be inside the current working directory.";
 
             if (!File.Exists(srcFull)) return $"Error: copy_file - source not found '{srcFull}'";
 
@@ -893,8 +843,6 @@ public static class ToolDispatcher
         {
             var srcFull = Path.GetFullPath(source);
             var dstFull = Path.GetFullPath(destination);
-            if (!IsSafePath(srcFull) || !IsSafePath(dstFull))
-                return $"Error: move_file - Paths must be inside the current working directory.";
 
             if (!File.Exists(srcFull)) return $"Error: move_file - source not found '{srcFull}'";
 
@@ -912,8 +860,6 @@ public static class ToolDispatcher
         try
         {
             var full = Path.GetFullPath(path);
-            if (!IsSafePath(full))
-                return $"Error: delete_file - Path '{full}' is not allowed for deletion. Only files in the current working directory are permitted.";
 
             if (!File.Exists(full)) return $"Error: delete_file - not found '{full}'";
 
@@ -931,8 +877,6 @@ public static class ToolDispatcher
         {
             var srcFull = Path.GetFullPath(source);
             var dstFull = Path.GetFullPath(destination);
-            if (!IsSafePath(srcFull) || !IsSafePath(dstFull))
-                return $"Error: zip - Paths must be inside the current working directory.";
 
             if (!File.Exists(srcFull) && !Directory.Exists(srcFull))
                 return $"Error: zip - source not found '{srcFull}'";
@@ -965,8 +909,6 @@ public static class ToolDispatcher
         {
             var arcFull = Path.GetFullPath(archive);
             var dstFull = Path.GetFullPath(destination);
-            if (!IsSafePath(arcFull) || !IsSafePath(dstFull))
-                return $"Error: unzip - Paths must be inside the current working directory.";
 
             if (!File.Exists(arcFull)) return $"Error: unzip - archive not found '{arcFull}'";
 
@@ -987,9 +929,6 @@ public static class ToolDispatcher
         {
             if (string.IsNullOrWhiteSpace(output))
                 return "Error: parse_output - 'output' argument is required.";
-
-            if (output.Length > MaxParseOutputBytes)
-                return $"Error: parse_output - output too large ({output.Length / 1024} KB). Max is {MaxParseOutputBytes / 1024} KB.";
 
             var fmt = (format ?? "auto").Trim().ToLowerInvariant();
             JsonNode? parsed;
@@ -1182,18 +1121,12 @@ public static class ToolDispatcher
     private static async Task<string> GitStatusAsync(string path)
     {
         var full = Path.GetFullPath(path);
-        if (!IsSafePath(full))
-            return $"Error: git_status - Path '{full}' is not allowed. Only paths in the current working directory are permitted.";
-
         return await RunGitAsync(full, "status --short --branch");
     }
 
     private static async Task<string> GitDiffAsync(string path, bool staged)
     {
         var full = Path.GetFullPath(path);
-        if (!IsSafePath(full))
-            return $"Error: git_diff - Path '{full}' is not allowed. Only paths in the current working directory are permitted.";
-
         var args = staged ? "diff --cached" : "diff";
         return await RunGitAsync(full, args);
     }
@@ -1201,29 +1134,19 @@ public static class ToolDispatcher
     private static async Task<string> GitLogAsync(string path, int count)
     {
         var full = Path.GetFullPath(path);
-        if (!IsSafePath(full))
-            return $"Error: git_log - Path '{full}' is not allowed. Only paths in the current working directory are permitted.";
-
         if (count < 1) count = 1;
-        if (count > 100) count = 100;
         return await RunGitAsync(full, $"log --oneline -n {count}");
     }
 
     private static async Task<string> GitBranchAsync(string path)
     {
         var full = Path.GetFullPath(path);
-        if (!IsSafePath(full))
-            return $"Error: git_branch - Path '{full}' is not allowed. Only paths in the current working directory are permitted.";
-
         return await RunGitAsync(full, "branch --list");
     }
 
     private static async Task<string> GitCommitAsync(string path, string message)
     {
         var full = Path.GetFullPath(path);
-        if (!IsSafePath(full))
-            return $"Error: git_commit - Path '{full}' is not allowed. Only paths in the current working directory are permitted.";
-
         if (string.IsNullOrWhiteSpace(message))
             return "Error: git_commit - 'message' argument is required.";
 
@@ -1264,11 +1187,7 @@ public static class ToolDispatcher
             var errTask = proc.StandardError.ReadToEndAsync();
             var waitTask = proc.WaitForExitAsync();
 
-            if (await Task.WhenAny(waitTask, Task.Delay(ShellTimeoutMs)) != waitTask)
-            {
-                try { proc.Kill(entireProcessTree: true); } catch { }
-                return "Error: git command timed out (60s).";
-            }
+            await waitTask;
 
             var output = ((await outTask) + (await errTask)).Trim();
             var prefix = proc.ExitCode == 0 ? $"OK (exit 0):\n" : $"Error (exit {proc.ExitCode}):\n";
@@ -1285,9 +1204,6 @@ public static class ToolDispatcher
     {
         try
         {
-            if (!IsSafeCommand(cmd, isWindows))
-                return $"Error: sh - Command '{cmd}' contains potentially dangerous operations and is not allowed.";
-
             var (file, shellArgs) = isWindows
                 ? ("cmd.exe", $"/d /s /c \"{cmd}\"")
                 : ("/bin/sh", $"-c \"{cmd.Replace("\"", "\\\"")}\"");
@@ -1312,11 +1228,7 @@ public static class ToolDispatcher
             var errTask = proc.StandardError.ReadToEndAsync();
             var waitTask = proc.WaitForExitAsync();
 
-            if (await Task.WhenAny(waitTask, Task.Delay(ShellTimeoutMs)) != waitTask)
-            {
-                try { proc.Kill(entireProcessTree: true); } catch { }
-                return "Error: command timed out (60s).";
-            }
+            await waitTask;
 
             var output = ((await outTask) + (await errTask)).Trim();
             var prefix = proc.ExitCode == 0 ? $"OK (exit 0):\n" : $"Error (exit {proc.ExitCode}):\n";
@@ -1346,7 +1258,6 @@ public static class ToolDispatcher
                 return $"Error: http_request - invalid URL '{url}'. Only http/https URLs are allowed.";
 
             if (timeoutMs < 1) timeoutMs = 1;
-            if (timeoutMs > 120_000) timeoutMs = 120_000;
 
             using var client = new HttpClient { Timeout = TimeSpan.FromMilliseconds(timeoutMs) };
 
@@ -1412,7 +1323,6 @@ public static class ToolDispatcher
                 return "Error: web_search - 'query' argument is required.";
 
             if (maxResults < 1) maxResults = 1;
-            if (maxResults > 10) maxResults = 10;
 
             // DuckDuckGo Instant Answer API — free, no API key required.
             var url = "https://api.duckduckgo.com/?q=" + Uri.EscapeDataString(query) +
@@ -1509,7 +1419,6 @@ public static class ToolDispatcher
                 return $"Error: fetch_url - invalid URL '{url}'. Only http/https URLs are allowed.";
 
             if (maxChars < 1) maxChars = 1;
-            if (maxChars > 100_000) maxChars = 100_000;
 
             using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
             client.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) CsAgentUI/1.0");
@@ -1584,11 +1493,7 @@ public static class ToolDispatcher
             if (string.IsNullOrWhiteSpace(cmd))
                 return "Error: run_terminal - 'cmd' argument is required.";
 
-            if (!IsSafeCommand(cmd, isWindows))
-                return $"Error: run_terminal - Command '{cmd}' contains potentially dangerous operations and is not allowed.";
-
             if (timeoutMs < 1) timeoutMs = 1;
-            if (timeoutMs > 300_000) timeoutMs = 300_000;
 
             TerminalSession term;
             lock (TerminalLock)
@@ -1669,9 +1574,6 @@ public static class ToolDispatcher
             lock (_lock)
             {
                 _output.AppendLine(line);
-                // Cap the buffer to avoid unbounded growth.
-                if (_output.Length > 512_000)
-                    _output.Remove(0, _output.Length - 512_000);
             }
         }
 
@@ -1748,57 +1650,6 @@ public static class ToolDispatcher
             return "Error: switch_model - model switching is not available in this context.";
 
         return switchModel(model.Trim());
-    }
-
-    // ── Safety checks ────────────────────────────────────────────────────────
-
-    private static bool IsSafePath(string fullPath)
-    {
-        try
-        {
-            var currentDir = Directory.GetCurrentDirectory();
-            var normalizedCurrent = Path.GetFullPath(currentDir).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-            var normalizedPath = Path.GetFullPath(fullPath).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-            return normalizedPath.StartsWith(normalizedCurrent, StringComparison.OrdinalIgnoreCase);
-        }
-        catch
-        {
-            return false;
-        }
-    }
-
-    private static bool IsSafeCommand(string cmd, bool isWindows)
-    {
-        var lowerCmd = cmd.ToLowerInvariant();
-
-        if (isWindows)
-        {
-            var windowsDangerous = new[]
-            {
-                "format ", "format.", "del /f", "del /s", "rd /s", "rmdir /s",
-                "reg delete", "reg add", "reg import",
-                "net user", "net localgroup", "net share", "net use",
-                "takeown", "icacls", "cacls",
-                "attrib -r -s -h", "bcdedit", "diskpart",
-                "powershell start-process -verb runas", "runas",
-                "shutdown", "reboot",
-                "\\windows\\system32\\", "\\windows\\system\\", "\\program files\\",
-            };
-            foreach (var pattern in windowsDangerous)
-                if (lowerCmd.Contains(pattern)) return false;
-        }
-        else
-        {
-            var unixDangerous = new[]
-            {
-                "sudo ", "chmod", "shutdown", "reboot", "dd ", "mkfs",
-                "/etc/", "/usr/bin/", "/bin/",
-            };
-            foreach (var pattern in unixDangerous)
-                if (lowerCmd.Contains(pattern)) return false;
-        }
-
-        return true;
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────
@@ -1883,37 +1734,6 @@ public static class ToolDispatcher
             return null;
         }
         return null;
-    }
-
-    /// <summary>
-    /// Detects whether a file is binary by scanning the first 8 KB for null bytes
-    /// or a high proportion of non-printable characters.
-    /// </summary>
-    private static bool IsBinaryFile(string filePath)
-    {
-        try
-        {
-            using var fs = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-            var buffer = new byte[Math.Min(fs.Length, 8192)];
-            int read = fs.Read(buffer, 0, buffer.Length);
-
-            int nullCount = 0;
-            int nonPrintableCount = 0;
-            for (int i = 0; i < read; i++)
-            {
-                if (buffer[i] == 0) nullCount++;
-                else if (buffer[i] < 9 || (buffer[i] > 13 && buffer[i] < 32)) nonPrintableCount++;
-            }
-
-            // Binary if there are null bytes or a high ratio of control characters.
-            if (nullCount > 0) return true;
-            if (read > 0 && (double)nonPrintableCount / read > 0.30) return true;
-            return false;
-        }
-        catch
-        {
-            return true; // If we can't read it, treat as binary to be safe.
-        }
     }
 
     private static string Sz(long b) =>

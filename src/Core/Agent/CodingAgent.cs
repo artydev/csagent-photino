@@ -94,12 +94,6 @@ public sealed class CodingAgent : IDisposable
                 {
                     result = "[dry-run] Tool not executed.";
                 }
-                else if (_opts.Confirm && ToolDispatcher.IsDestructive(funcName))
-                {
-                    result = await _observer.Confirm(funcName)
-                        ? await ToolDispatcher.DispatchAsync(funcName, argsRaw, isWindows, switchModel)
-                        : "Tool call declined by user.";
-                }
                 else
                 {
                     result = await ToolDispatcher.DispatchAsync(funcName, argsRaw, isWindows, switchModel);

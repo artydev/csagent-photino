@@ -5,8 +5,9 @@
 
 ## Current step
 
-**Step 9.3 — DONE.** Full clean build succeeds with **0 warnings and 0 errors**.
-All tasks complete. Desktop mode via Photino is fully implemented.
+**Step 10.1 — DONE.** All tool restrictions removed (path sandboxing, shell
+filtering, destructive confirmation, timeouts, size caps). Build succeeds with
+**0 warnings and 0 errors**.
 
 ## Task status
 
@@ -60,6 +61,17 @@ All tasks complete. Desktop mode via Photino is fully implemented.
 | 9.2 | Remove leftover SSE/ASP.NET from desktop path | ✅ |
 | 9.3 | Full build + update PROGRESS.md | ✅ |
 
+### Phase F — Remove tool restrictions (temporary)
+
+| # | Task | Status |
+|---|------|--------|
+| 10.1 | Remove all tool restrictions | ✅ |
+| 10.2 | Verify Debug standalone build | ✅ |
+| 10.3 | Verify Release build | ✅ |
+| 10.4 | Verify AOT standalone publish | ✅ |
+| 10.5 | Inspect project structure | ✅ |
+| 10.6 | Document launching modes | ✅ |
+
 ## Build verification
 
 - **Task 1.1:** `dotnet build -c Debug` → `Build succeeded`, `0 Error(s)`.
@@ -101,3 +113,17 @@ All tasks complete. Desktop mode via Photino is fully implemented.
   `0 Warning(s)`, `0 Error(s)`. Fixed CS8604 nullable warnings in
   `ToolDispatcher`; suppressed accepted AOT/trimming warnings (IL2026/IL3050)
   via `<NoWarn>` in `CsAgentUI.csproj`. All tasks complete.
+- **Task 10.1:** `dotnet build -c Debug` → `Build succeeded`, `0 Warning(s)`,
+  `0 Error(s)`. Removed `IsSafePath`, `IsSafeCommand`, `IsDestructive`,
+  `IsBinaryFile`, all timeout clamps, and all size caps from `ToolDispatcher`;
+  removed the destructive-confirmation branch from `CodingAgent`.
+- **Task 10.2:** `dotnet build -c Debug` → `Build succeeded`, `0 Warning(s)`,
+  `0 Error(s)`.
+- **Task 10.3:** `dotnet build -c Release` → `Build succeeded`, `0 Warning(s)`,
+  `0 Error(s)`.
+- **Task 10.4:** `dotnet publish -c Release -r linux-x64 --self-contained true
+  -p:PublishAot=true` → `Build succeeded`, `0 Warning(s)`, `0 Error(s)`.
+  Native ELF 64-bit x86-64 executable produced.
+- **Task 10.5:** Project root, `src/`, and full visual tree inspected.
+- **Task 10.6:** Launching modes documented (CLI/TUI, Web UI, Desktop, plus
+  `--help`/`--version`/`--doc` and common options).
